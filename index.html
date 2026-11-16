@@ -67,6 +67,7 @@
   .anadir { background: var(--anadir); } .quitar { background: var(--quitar); }
   .acciones button:disabled { opacity: .5; }
   .producto, .nuevo { display: grid; }
+  .pie { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; }
 
   .nuevo form, .ajustes form { display: grid; gap: 10px; margin-top: 10px; }
   label { display: grid; gap: 4px; font-size: 14px; color: var(--suave); }
@@ -81,6 +82,26 @@
   .recientes .mas { color: var(--anadir); font-weight: 700; } .recientes .menos { color: var(--quitar); font-weight: 700; }
   .recientes .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .recientes .res { color: var(--suave); }
+
+  .modos { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--linea); border-radius: 10px; overflow: hidden; background: #fff; }
+  .modos button { min-height: 44px; border: 0; border-left: 1px solid var(--linea); background: none; font-size: 14px; padding: 6px 4px; }
+  .modos button:first-child { border-left: 0; }
+  .modos button[aria-pressed="true"] { background: var(--tinta); color: #fff; font-weight: 600; }
+  .visor.entrada { outline: 4px solid var(--anadir); }
+  .visor.salida { outline: 4px solid var(--quitar); }
+  .atajos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .motivo { margin-bottom: 10px; }
+  .lista { list-style: none; margin: 6px 0 0; padding: 0; }
+  .lista button { width: 100%; min-height: 52px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    text-align: left; background: none; border: 0; border-top: 1px solid var(--linea); padding: 10px 0; }
+  .lista li:first-child button { border-top: 0; }
+  .lista .nom { overflow-wrap: anywhere; }
+  .lista .sub { display: block; font-size: 13px; color: var(--suave); }
+  .lista .cant { font-family: var(--mono); white-space: nowrap; font-size: 14px; }
+  .lista .cant.bajo { color: var(--quitar); font-weight: 700; }
+  .cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin: 10px 0 6px; }
+  .cifras div { display: grid; }
+  .cifras strong { font-family: var(--mono); font-size: 22px; overflow-wrap: anywhere; }
 
   #aviso { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(480px, calc(100% - 28px));
     background: var(--tinta); color: #fff; padding: 13px 16px; border-radius: 12px; font-size: 15px;
@@ -114,6 +135,9 @@
       <label>PIN (solo si definiste uno en el script)
         <input id="aPin" class="campo" type="password" inputmode="numeric" autocomplete="off">
       </label>
+      <label>Tu nombre (queda anotado en cada movimiento)
+        <input id="aUsuario" class="campo" autocomplete="off" maxlength="40">
+      </label>
       <p id="aError" class="error" hidden></p>
       <button class="btn" id="btnConectar">Conectar</button>
       <button type="button" class="btn sec" id="btnCompartir" hidden>Copiar enlace para otro dispositivo</button>
@@ -124,6 +148,12 @@
   </section>
 
   <div id="vistaEscaner" hidden style="display:grid;gap:14px">
+    <div class="modos" id="modos" role="group" aria-label="Modo de escaneo">
+      <button type="button" data-modo="normal" aria-pressed="true">Uno a uno</button>
+      <button type="button" data-modo="entrada" aria-pressed="false">Entrada rápida</button>
+      <button type="button" data-modo="salida" aria-pressed="false">Salida rápida</button>
+    </div>
+
     <div class="visor" id="visor">
       <video id="video" playsinline muted autoplay></video>
       <div class="guia" id="guia" hidden></div>
@@ -136,9 +166,14 @@
 
     <form id="formCodigo" class="fila">
       <input id="codigo" class="campo mono" autocomplete="off" autocapitalize="off" spellcheck="false"
-             enterkeyhint="search" placeholder="o escribe el código" aria-label="Código del producto">
+             enterkeyhint="search" placeholder="código o nombre" aria-label="Código o nombre del producto">
       <button class="btn">Buscar</button>
     </form>
+
+    <div class="atajos">
+      <button type="button" class="btn sec" id="btnReponer">Por reponer</button>
+      <button type="button" class="btn sec" id="btnResumen">Resumen</button>
+    </div>
 
     <section id="panelProducto" class="tarjeta producto" hidden>
       <p class="etq">Producto</p>
@@ -154,11 +189,53 @@
         <input id="cantidad" class="campo" type="number" inputmode="numeric" min="1" step="1" value="1" aria-label="Cantidad">
         <button type="button" id="btnMas" aria-label="Una unidad más">+</button>
       </div>
+      <label class="motivo">Motivo (opcional)
+        <select id="motivo" class="campo">
+          <option value="">Sin especificar</option>
+          <option>Venta</option>
+          <option>Reposición</option>
+          <option>Devolución</option>
+          <option>Merma o pérdida</option>
+          <option>Uso interno</option>
+        </select>
+      </label>
       <div class="acciones">
         <button type="button" class="quitar" id="btnQuitar">− Quitar</button>
         <button type="button" class="anadir" id="btnAnadir">+ Añadir</button>
       </div>
-      <button type="button" class="enlace" data-cancelar>Cancelar</button>
+      <div class="pie">
+        <button type="button" class="enlace" id="btnEditar">Editar producto</button>
+        <button type="button" class="enlace" data-cancelar>Cancelar</button>
+      </div>
+    </section>
+
+    <section id="panelEditar" class="tarjeta nuevo" hidden>
+      <p class="etq">Editar producto</p>
+      <p class="mono" id="eCodigo" style="margin:2px 0 0;font-size:18px;overflow-wrap:anywhere"></p>
+      <form id="formEditar">
+        <label>Nombre del producto
+          <input id="eNombre" class="campo" required autocomplete="off">
+        </label>
+        <label>Categoría
+          <input id="eCategoria" class="campo" autocomplete="off">
+        </label>
+        <div class="dos">
+          <label>Precio de venta
+            <input id="ePrecio" class="campo" type="number" inputmode="decimal" min="0" step="any">
+          </label>
+          <label>Costo
+            <input id="eCosto" class="campo" type="number" inputmode="decimal" min="0" step="any">
+          </label>
+        </div>
+        <label>Stock mínimo (bajo este número aparece en "Por reponer")
+          <input id="eMinimo" class="campo" type="number" inputmode="numeric" min="0" step="any">
+        </label>
+        <label>Stock actual (cámbialo solo para corregir un conteo)
+          <input id="eStock" class="campo" type="number" inputmode="decimal" min="0" step="any">
+        </label>
+        <button class="btn" id="btnGuardarEdicion">Guardar cambios</button>
+      </form>
+      <button type="button" class="enlace" id="btnVolverEdicion">Volver sin guardar</button>
     </section>
 
     <section id="panelNuevo" class="tarjeta nuevo" hidden>
@@ -172,24 +249,52 @@
           <input id="nCategoria" class="campo" autocomplete="off">
         </label>
         <div class="dos">
-          <label>Precio
+          <label>Precio de venta
             <input id="nPrecio" class="campo" type="number" inputmode="decimal" min="0" step="any">
           </label>
+          <label>Costo
+            <input id="nCosto" class="campo" type="number" inputmode="decimal" min="0" step="any">
+          </label>
+        </div>
+        <div class="dos">
           <label>Stock mínimo
             <input id="nMinimo" class="campo" type="number" inputmode="numeric" min="0" step="1">
           </label>
+          <label>Cantidad inicial
+            <input id="nCantidad" class="campo" type="number" inputmode="numeric" min="0" step="1" value="1">
+          </label>
         </div>
-        <label>Cantidad inicial
-          <input id="nCantidad" class="campo" type="number" inputmode="numeric" min="0" step="1" value="1">
-        </label>
         <button class="btn" id="btnGuardar">Guardar producto</button>
       </form>
       <button type="button" class="enlace" data-cancelar>Cancelar</button>
     </section>
 
+    <section id="panelLista" class="tarjeta" hidden>
+      <p class="etq" id="lTitulo"></p>
+      <p class="nota" id="lVacio" hidden></p>
+      <ul class="lista" id="lItems"></ul>
+      <div class="pie">
+        <button type="button" class="enlace" id="lCrear" hidden>Crear producto con este código</button>
+        <button type="button" class="enlace" data-cancelar>Cerrar</button>
+      </div>
+    </section>
+
+    <section id="panelResumen" class="tarjeta" hidden>
+      <p class="etq">Resumen del inventario</p>
+      <div class="cifras">
+        <div><span class="nota">Productos</span><strong id="rProductos">–</strong></div>
+        <div><span class="nota">Unidades</span><strong id="rUnidades">–</strong></div>
+        <div><span class="nota">Valor a costo</span><strong id="rCosto">–</strong></div>
+        <div><span class="nota">Valor a precio de venta</span><strong id="rVenta">–</strong></div>
+        <div><span class="nota">Por reponer</span><strong id="rReponer">–</strong></div>
+      </div>
+      <div class="pie"><button type="button" class="enlace" data-cancelar>Cerrar</button></div>
+    </section>
+
     <section class="tarjeta recientes" id="recientes" hidden>
       <h3 class="etq">Últimos movimientos en este dispositivo</h3>
       <ul id="listaRecientes"></ul>
+      <div class="pie"><button type="button" class="enlace" id="btnDeshacer" hidden></button></div>
     </section>
   </div>
 </main>
@@ -216,6 +321,11 @@
   var video = $('video');
   var camara = 'apagada';     // apagada | leyendo | pausa
   var ultimo = { codigo: '', hora: 0 };
+  var modo = 'normal';        // normal | entrada | salida (los dos últimos mueven 1 unidad por escaneo)
+  var porReponer = 0;
+  var deshacer = null;        // último movimiento que se puede revertir
+  var codigoLista = '';       // código que la lista de resultados ofrece crear
+  var PANELES = ['panelProducto', 'panelNuevo', 'panelEditar', 'panelLista', 'panelResumen'];
 
   /* ---------- Configuración guardada ---------- */
 
@@ -228,18 +338,18 @@
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     }
     if (API_FIJA) c.api = API_FIJA;
-    return { api: c.api || '', pin: c.pin || '', demo: false };
+    return { api: c.api || '', pin: c.pin || '', usuario: c.usuario || '', demo: false };
   }
 
   function guardarCfg() {
-    try { localStorage.setItem(ALMACEN, JSON.stringify({ api: cfg.api, pin: cfg.pin })); } catch (e) {}
+    try { localStorage.setItem(ALMACEN, JSON.stringify({ api: cfg.api, pin: cfg.pin, usuario: cfg.usuario })); } catch (e) {}
   }
 
   /* ---------- Llamadas a la planilla ---------- */
 
   function api(accion, datos) {
     if (cfg.demo) return demo(accion, datos || {});
-    var cuerpo = Object.assign({ accion: accion, pin: cfg.pin }, datos || {});
+    var cuerpo = Object.assign({ accion: accion, pin: cfg.pin, usuario: cfg.usuario }, datos || {});
     // text/plain evita la consulta previa (preflight) de CORS, que Apps Script no responde.
     return fetch(cfg.api, {
       method: 'POST',
@@ -260,24 +370,49 @@
 
   // Datos de ejemplo en memoria, para probar la página sin planilla.
   var demoDatos = {
-    '7801234567894': { codigo: '7801234567894', producto: 'Bebida cola 1,5 L', categoria: 'Bebidas', stock: 12, minimo: 6, precio: 1890 },
-    '7809876543214': { codigo: '7809876543214', producto: 'Arroz grado 1, 1 kg', categoria: 'Abarrotes', stock: 4, minimo: 5, precio: 1490 }
+    '7801234567894': { codigo: '7801234567894', producto: 'Bebida cola 1,5 L', categoria: 'Bebidas', stock: 12, minimo: 6, precio: 1890, costo: 1250 },
+    '7809876543214': { codigo: '7809876543214', producto: 'Arroz grado 1, 1 kg', categoria: 'Abarrotes', stock: 4, minimo: 5, precio: 1490, costo: 980 }
   };
+  function demoTodos() { return Object.keys(demoDatos).map(function (k) { return Object.assign({}, demoDatos[k]); }); }
+  function demoFiltrar(texto) {
+    var t = String(texto || '').toLowerCase();
+    return demoTodos().filter(function (x) { return (x.codigo + ' ' + x.producto + ' ' + x.categoria).toLowerCase().indexOf(t) >= 0; });
+  }
   function demo(accion, d) {
     return new Promise(function (ok, mal) {
       setTimeout(function () {
         try {
-          if (accion === 'estado') return ok({ negocio: 'Demostración (no guarda nada)', productos: Object.keys(demoDatos).length });
+          if (accion === 'estado') {
+            var e = { negocio: 'Demostración (no guarda nada)', productos: 0, unidades: 0, valorCosto: 0, valorVenta: 0, porReponer: 0 };
+            demoTodos().forEach(function (x) {
+              e.productos++; e.unidades += x.stock; e.valorCosto += x.stock * x.costo; e.valorVenta += x.stock * x.precio;
+              if (x.stock <= x.minimo) e.porReponer++;
+            });
+            return ok(e);
+          }
+          if (accion === 'listar') {
+            var l = d.filtro === 'bajo' ? demoTodos().filter(function (x) { return x.stock <= x.minimo; }) : demoFiltrar(d.texto);
+            return ok({ total: l.length, productos: l });
+          }
           var p = demoDatos[d.codigo];
-          if (accion === 'buscar') return ok(p ? { encontrado: true, producto: Object.assign({}, p) } : { encontrado: false, codigo: d.codigo });
+          if (accion === 'buscar') {
+            if (p) return ok({ encontrado: true, producto: Object.assign({}, p) });
+            return ok({ encontrado: false, codigo: d.codigo, parecidos: d.ampliar ? demoFiltrar(d.codigo) : undefined });
+          }
+          if (!p && accion !== 'crear') throw new Error('El código ' + d.codigo + ' no está en el inventario');
           if (accion === 'mover') {
             var n = p.stock + (d.tipo === 'entrada' ? d.cantidad : -d.cantidad);
             if (n < 0) throw new Error('No se puede quitar ' + d.cantidad + ': solo hay ' + p.stock + ' en stock');
             p.stock = n;
             return ok(Object.assign({}, p));
           }
+          if (accion === 'editar') {
+            p.producto = d.producto; p.categoria = d.categoria; p.precio = d.precio; p.minimo = d.minimo; p.costo = d.costo;
+            if (d.stock !== undefined) p.stock = d.stock;
+            return ok(Object.assign({}, p));
+          }
           if (accion === 'crear') {
-            demoDatos[d.codigo] = { codigo: d.codigo, producto: d.producto, categoria: d.categoria, stock: d.stock, minimo: d.minimo, precio: d.precio };
+            demoDatos[d.codigo] = { codigo: d.codigo, producto: d.producto, categoria: d.categoria, stock: d.stock, minimo: d.minimo, precio: d.precio, costo: d.costo };
             return ok(Object.assign({}, demoDatos[d.codigo]));
           }
         } catch (e) { mal(e); }
@@ -298,11 +433,12 @@
 
   function ocupar(si) {
     ocupado = si;
-    ['btnAnadir', 'btnQuitar', 'btnGuardar', 'btnConectar'].forEach(function (id) { $(id).disabled = si; });
+    ['btnAnadir', 'btnQuitar', 'btnGuardar', 'btnGuardarEdicion', 'btnConectar', 'btnDeshacer', 'btnReponer', 'btnResumen'].forEach(function (id) { $(id).disabled = si; });
   }
 
   function fallo(e) {
     var msg = (e && e.message) || String(e);
+    if (/Acción desconocida/.test(msg)) msg = 'La planilla tiene una versión anterior del script. Actualiza Code.gs y publica una "Nueva versión" de la implementación.';
     aviso(msg, true);
     if (/PIN/.test(msg)) abrirAjustes(msg);
   }
@@ -314,6 +450,7 @@
   function abrirAjustes(error) {
     $('aUrl').value = cfg.api;
     $('aPin').value = cfg.pin;
+    $('aUsuario').value = cfg.usuario;
     $('aError').hidden = !error;
     $('aError').textContent = error || '';
     var conectado = !!cfg.api || cfg.demo;
@@ -333,13 +470,32 @@
     ocupar(true);
     $('negocio').textContent = 'Conectando…';
     return api('estado').then(function (e) {
-      $('negocio').textContent = e.negocio + ' · ' + nf.format(e.productos) + ' productos';
+      pintarEstado(e);
       cerrarAjustes();
     }).catch(function (e) {
       $('negocio').textContent = 'Sin conectar';
       abrirAjustes((e && e.message) || String(e));
     }).then(function () { ocupar(false); });
   }
+
+  function dinero(n) { return '$' + nf.format(Math.round(n || 0)); }
+
+  function pintarEstado(e) {
+    $('negocio').textContent = e.negocio + ' · ' + nf.format(e.productos) + ' productos';
+    ponerReponer(e.porReponer || 0);
+    $('rProductos').textContent = nf.format(e.productos);
+    $('rUnidades').textContent = nf.format(e.unidades || 0);
+    $('rCosto').textContent = dinero(e.valorCosto);
+    $('rVenta').textContent = dinero(e.valorVenta);
+    $('rReponer').textContent = nf.format(e.porReponer || 0);
+  }
+
+  function ponerReponer(n) {
+    porReponer = Math.max(0, n);
+    $('btnReponer').textContent = 'Por reponer' + (porReponer ? ' · ' + nf.format(porReponer) : '');
+  }
+
+  function bajo(p) { return p.stock <= p.minimo ? 1 : 0; }
 
   $('formAjustes').addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -349,12 +505,12 @@
       $('aError').textContent = 'Esa no parece la URL de la aplicación web. Debe empezar con https://script.google.com/ y terminar en /exec.';
       return;
     }
-    cfg.api = url; cfg.pin = $('aPin').value.trim(); cfg.demo = false;
+    cfg.api = url; cfg.pin = $('aPin').value.trim(); cfg.usuario = $('aUsuario').value.trim(); cfg.demo = false;
     guardarCfg();
     conectar();
   });
 
-  $('btnDemo').addEventListener('click', function () { cfg.demo = true; conectar(); });
+  $('btnDemo').addEventListener('click', function () { cfg.usuario = $('aUsuario').value.trim(); cfg.demo = true; conectar(); });
   $('btnAjustes').addEventListener('click', function () { cerrarPaneles(); abrirAjustes(); });
   $('btnCerrarAjustes').addEventListener('click', cerrarAjustes);
 
@@ -379,8 +535,31 @@
     $('visorInicio').hidden = nuevo !== 'apagada';
     $('guia').hidden = nuevo === 'apagada';
     $('visorEstado').hidden = nuevo === 'apagada';
-    $('visorEstado').textContent = nuevo === 'pausa' ? 'En pausa' : 'Buscando código…';
+    $('visorEstado').textContent = nuevo === 'pausa' ? 'En pausa'
+      : modo === 'entrada' ? 'Entrada rápida: +1 por escaneo'
+      : modo === 'salida' ? 'Salida rápida: −1 por escaneo'
+      : 'Buscando código…';
   }
+
+  function hayPanel() { return PANELES.some(function (id) { return !$(id).hidden; }); }
+
+  function ponerModo(nuevo) {
+    modo = nuevo;
+    Array.prototype.forEach.call($('modos').children, function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-modo') === nuevo ? 'true' : 'false');
+    });
+    $('visor').classList.toggle('entrada', nuevo === 'entrada');
+    $('visor').classList.toggle('salida', nuevo === 'salida');
+    if (nuevo !== 'normal') {
+      cerrarPaneles();
+      aviso(nuevo === 'entrada' ? 'Entrada rápida: cada escaneo suma 1 unidad.' : 'Salida rápida: cada escaneo descuenta 1 unidad.');
+    }
+    estadoCamara(camara);
+  }
+
+  Array.prototype.forEach.call($('modos').children, function (b) {
+    b.addEventListener('click', function () { ponerModo(b.getAttribute('data-modo')); });
+  });
 
   // Usa el lector del propio navegador si entiende códigos de barras (Chrome en Android); si no, carga el de respaldo.
   function crearDetector() {
@@ -419,7 +598,7 @@
       video.srcObject = flujo;
       return video.play();
     }).then(function () {
-      estadoCamara(actual || codigoNuevo ? 'pausa' : 'leyendo');
+      estadoCamara(hayPanel() ? 'pausa' : 'leyendo');
       leerCuadro();
     }).catch(function (e) {
       boton.disabled = false; boton.textContent = 'Activar cámara';
@@ -461,17 +640,19 @@
     texto = String(texto || '').trim();
     var ahora = Date.now();
     if (!texto || ocupado || camara !== 'leyendo') return;
-    if (texto === ultimo.codigo && ahora - ultimo.hora < 3000) return;   // el mismo código sigue frente a la cámara
+    // El mismo código sigue frente a la cámara: no se vuelve a contar hasta que se retire unos 2 segundos.
+    if (texto === ultimo.codigo && ahora - ultimo.hora < 2000) { ultimo.hora = ahora; return; }
     if (navigator.vibrate) navigator.vibrate(60);
-    buscar(texto);
+    if (modo === 'normal') buscar(texto); else rapido(texto);
   }
 
   function pausar() { if (camara === 'leyendo') estadoCamara('pausa'); }
-  function reanudar() { if (camara === 'pausa') estadoCamara('leyendo'); }
+  function reanudar() { if (camara === 'pausa') { ultimo.hora = Date.now(); estadoCamara('leyendo'); } }
 
   /* ---------- Buscar, mover y crear ---------- */
 
-  function buscar(codigo) {
+  // "ampliar" se usa cuando el texto se escribió a mano: si no es un código exacto, busca por nombre.
+  function buscar(codigo, ampliar) {
     codigo = String(codigo || '').trim();
     if (!codigo || ocupado) return;
     ultimo = { codigo: codigo, hora: Date.now() };
@@ -479,9 +660,12 @@
     pausar();
     ocupar(true);
     aviso('Buscando ' + codigo + '…');
-    api('buscar', { codigo: codigo }).then(function (r) {
+    api('buscar', { codigo: codigo, ampliar: !!ampliar }).then(function (r) {
       $('aviso').className = '';
-      if (r.encontrado) mostrarProducto(r.producto); else mostrarNuevo(r.codigo);
+      if (r.encontrado) mostrarProducto(r.producto);
+      else if (ampliar && r.parecidos && r.parecidos.length) mostrarLista('Resultados para "' + codigo + '"', r.parecidos, /\s/.test(codigo) ? '' : codigo);
+      else if (ampliar && /\s/.test(codigo)) { aviso('Sin resultados para "' + codigo + '".', true); reanudar(); }
+      else mostrarNuevo(r.codigo);
     }).catch(function (e) {
       fallo(e); reanudar();
     }).then(function () { ocupar(false); });
@@ -496,6 +680,7 @@
     $('pStock').textContent = nf.format(p.stock);
     $('pBajo').hidden = !(p.stock <= p.minimo);
     $('cantidad').value = 1;
+    $('motivo').value = '';
     $('panelProducto').hidden = false;
     $('panelProducto').scrollIntoView({ block: 'nearest' });
   }
@@ -510,8 +695,7 @@
 
   function cerrarPaneles(sinReanudar) {
     actual = null; codigoNuevo = '';
-    $('panelProducto').hidden = true;
-    $('panelNuevo').hidden = true;
+    PANELES.forEach(function (id) { $(id).hidden = true; });
     if (!sinReanudar) { reanudar(); enfocarCodigo(); }
   }
 
@@ -520,13 +704,104 @@
     var n = Math.floor(Number($('cantidad').value));
     if (!(n > 0)) { aviso('Ingresa una cantidad mayor que cero.', true); return; }
     ocupar(true);
-    api('mover', { codigo: actual.codigo, cantidad: n, tipo: tipo }).then(function (p) {
-      registrar(tipo === 'entrada' ? n : -n, p);
-      aviso((tipo === 'entrada' ? 'Añadido ' : 'Quitado ') + nf.format(n) + ' · ' + p.producto + ' · stock ' + nf.format(p.stock));
-      ultimo.hora = Date.now();
+    api('mover', { codigo: actual.codigo, cantidad: n, tipo: tipo, motivo: $('motivo').value }).then(function (p) {
+      despuesDeMover(tipo, n, p);
       cerrarPaneles();
     }).catch(fallo).then(function () { ocupar(false); });
   }
+
+  // Deja constancia de un movimiento ya guardado: historial, aviso, contador de reposición y "deshacer".
+  function despuesDeMover(tipo, n, p, nota) {
+    var delta = tipo === 'entrada' ? n : -n;
+    registrar(delta, p, nota);
+    aviso((nota === 'deshecho' ? 'Deshecho · ' : '') + (tipo === 'entrada' ? 'Añadido ' : 'Quitado ') + nf.format(n) + ' · ' + p.producto + ' · stock ' + nf.format(p.stock));
+    ponerReponer(porReponer + bajo(p) - bajo({ stock: p.stock - delta, minimo: p.minimo }));
+    deshacer = nota === 'deshecho' ? null : { codigo: p.codigo, producto: p.producto, tipo: tipo, cantidad: n };
+    pintarDeshacer();
+    ultimo.hora = Date.now();
+  }
+
+  // Modo rápido: el escaneo mueve 1 unidad de inmediato, sin abrir la ficha.
+  function rapido(codigo) {
+    var tipo = modo;
+    ultimo = { codigo: codigo, hora: Date.now() };
+    ocupar(true);
+    api('mover', { codigo: codigo, cantidad: 1, tipo: tipo, motivo: tipo === 'salida' ? 'Venta' : 'Reposición' }).then(function (p) {
+      despuesDeMover(tipo, 1, p);
+    }).catch(function (e) {
+      if (/no está en el inventario/.test((e && e.message) || '')) {
+        pausar();
+        mostrarNuevo(codigo);
+        aviso('Ese código no está registrado. Créalo para seguir.', true);
+      } else fallo(e);
+    }).then(function () { ocupar(false); });
+  }
+
+  function pintarDeshacer() {
+    var b = $('btnDeshacer');
+    b.hidden = !deshacer;
+    if (deshacer) b.textContent = 'Deshacer: ' + (deshacer.tipo === 'entrada' ? '+' : '−') + nf.format(deshacer.cantidad) + ' ' + deshacer.producto;
+  }
+
+  $('btnDeshacer').addEventListener('click', function () {
+    if (!deshacer || ocupado) return;
+    var d = deshacer, tipo = d.tipo === 'entrada' ? 'salida' : 'entrada';
+    ocupar(true);
+    api('mover', { codigo: d.codigo, cantidad: d.cantidad, tipo: tipo, motivo: 'Deshacer' }).then(function (p) {
+      despuesDeMover(tipo, d.cantidad, p, 'deshecho');
+    }).catch(fallo).then(function () { ocupar(false); });
+  });
+
+  /* ---------- Listas: resultados de búsqueda y productos por reponer ---------- */
+
+  function mostrarLista(titulo, productos, codigoCrear, textoVacio) {
+    $('lTitulo').textContent = titulo;
+    var ul = $('lItems');
+    ul.textContent = '';
+    productos.forEach(function (p) {
+      var li = document.createElement('li'), b = document.createElement('button');
+      var nom = document.createElement('span'), sub = document.createElement('span'), cant = document.createElement('span');
+      b.type = 'button';
+      nom.className = 'nom'; nom.textContent = p.producto || '(sin nombre)';
+      sub.className = 'sub mono'; sub.textContent = p.codigo;
+      cant.className = 'cant' + (bajo(p) ? ' bajo' : '');
+      cant.textContent = nf.format(p.stock) + ' / mín ' + nf.format(p.minimo);
+      nom.appendChild(sub); b.appendChild(nom); b.appendChild(cant);
+      b.addEventListener('click', function () { cerrarPaneles(true); pausar(); mostrarProducto(p); });
+      li.appendChild(b); ul.appendChild(li);
+    });
+    $('lVacio').hidden = productos.length > 0;
+    $('lVacio').textContent = textoVacio || '';
+    codigoLista = codigoCrear || '';
+    $('lCrear').hidden = !codigoLista;
+    pausar();
+    $('panelLista').hidden = false;
+    $('panelLista').scrollIntoView({ block: 'nearest' });
+  }
+
+  $('lCrear').addEventListener('click', function () {
+    var c = codigoLista;
+    cerrarPaneles(true); pausar(); mostrarNuevo(c);
+  });
+
+  $('btnReponer').addEventListener('click', function () {
+    if (ocupado) return;
+    cerrarPaneles(true); pausar(); ocupar(true);
+    api('listar', { filtro: 'bajo' }).then(function (r) {
+      ponerReponer(r.total);
+      mostrarLista('Por reponer · ' + nf.format(r.total), r.productos, '', 'Ningún producto está en su mínimo o bajo él.');
+    }).catch(function (e) { fallo(e); reanudar(); }).then(function () { ocupar(false); });
+  });
+
+  $('btnResumen').addEventListener('click', function () {
+    if (ocupado) return;
+    cerrarPaneles(true); pausar(); ocupar(true);
+    api('estado').then(function (e) {
+      pintarEstado(e);
+      $('panelResumen').hidden = false;
+      $('panelResumen').scrollIntoView({ block: 'nearest' });
+    }).catch(function (e) { fallo(e); reanudar(); }).then(function () { ocupar(false); });
+  });
 
   $('btnAnadir').addEventListener('click', function () { mover('entrada'); });
   $('btnQuitar').addEventListener('click', function () { mover('salida'); });
@@ -541,15 +816,62 @@
       producto: $('nNombre').value.trim(),
       categoria: $('nCategoria').value.trim(),
       precio: Number($('nPrecio').value) || 0,
+      costo: Number($('nCosto').value) || 0,
       minimo: Number($('nMinimo').value) || 0,
       stock: Number($('nCantidad').value) || 0
     };
     ocupar(true);
     api('crear', datos).then(function (p) {
-      registrar(p.stock, p, true);
+      registrar(p.stock, p, 'nuevo');
+      ponerReponer(porReponer + bajo(p));
+      deshacer = null; pintarDeshacer();
       aviso('Producto guardado · ' + p.producto + ' · stock ' + nf.format(p.stock));
       ultimo.hora = Date.now();
       cerrarPaneles();
+    }).catch(fallo).then(function () { ocupar(false); });
+  });
+
+  /* ---------- Editar un producto ---------- */
+
+  $('btnEditar').addEventListener('click', function () {
+    if (!actual || ocupado) return;
+    $('eCodigo').textContent = actual.codigo;
+    $('eNombre').value = actual.producto;
+    $('eCategoria').value = actual.categoria;
+    $('ePrecio').value = actual.precio;
+    $('eCosto').value = actual.costo || '';
+    $('eMinimo').value = actual.minimo;
+    $('eStock').value = actual.stock;
+    $('panelProducto').hidden = true;
+    $('panelEditar').hidden = false;
+  });
+
+  $('btnVolverEdicion').addEventListener('click', function () {
+    $('panelEditar').hidden = true;
+    $('panelProducto').hidden = false;
+  });
+
+  $('formEditar').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (!actual || ocupado) return;
+    var antes = actual.stock, bajoAntes = bajo(actual);
+    var datos = {
+      codigo: actual.codigo,
+      producto: $('eNombre').value.trim(),
+      categoria: $('eCategoria').value.trim(),
+      precio: Number($('ePrecio').value) || 0,
+      costo: Number($('eCosto').value) || 0,
+      minimo: Number($('eMinimo').value) || 0
+    };
+    // El stock solo viaja si se cambió a mano; así no se pisa un movimiento hecho desde otro teléfono.
+    if ($('eStock').value !== '' && Number($('eStock').value) !== antes) datos.stock = Number($('eStock').value);
+    ocupar(true);
+    api('editar', datos).then(function (p) {
+      if (datos.stock !== undefined && p.stock !== antes) { registrar(p.stock - antes, p, 'ajuste'); deshacer = null; pintarDeshacer(); }
+      ponerReponer(porReponer + bajo(p) - bajoAntes);
+      aviso('Cambios guardados · ' + p.producto);
+      $('panelEditar').hidden = true;
+      mostrarProducto(p);
     }).catch(fallo).then(function () { ocupar(false); });
   });
 
@@ -557,7 +879,7 @@
     ev.preventDefault();
     var c = $('codigo').value;
     $('codigo').value = '';
-    buscar(c);
+    buscar(c, true);
   });
 
   Array.prototype.forEach.call(document.querySelectorAll('[data-cancelar]'), function (b) {
@@ -571,14 +893,14 @@
 
   /* ---------- Historial de la sesión ---------- */
 
-  function registrar(delta, p, alta) {
+  function registrar(delta, p, nota) {
     var li = document.createElement('li');
     var d = document.createElement('span');
     d.className = 'mono ' + (delta < 0 ? 'menos' : 'mas');
     d.textContent = (delta < 0 ? '−' : '+') + nf.format(Math.abs(delta));
     var n = document.createElement('span');
     n.className = 'nom';
-    n.textContent = p.producto + (alta ? ' (nuevo)' : '');
+    n.textContent = p.producto + (nota ? ' (' + nota + ')' : '');
     var r = document.createElement('span');
     r.className = 'res mono';
     r.textContent = 'queda ' + nf.format(p.stock);
