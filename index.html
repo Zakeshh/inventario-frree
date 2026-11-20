@@ -75,6 +75,9 @@
   .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .nota { font-size: 14px; color: var(--suave); margin: 0; }
   .error { color: var(--quitar); font-size: 14px; margin: 0; }
+  label.casilla { display: flex; align-items: center; gap: 10px; color: var(--tinta); min-height: 44px; }
+  label.casilla input { width: 22px; height: 22px; accent-color: var(--tinta); }
+  .nota-auto { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #e6f1ea; color: #14502f; font-size: 14px; }
 
   .recientes h3 { margin: 0 0 6px; }
   .recientes ul { list-style: none; margin: 0; padding: 0; }
@@ -189,6 +192,7 @@
       <label>Tu nombre (queda anotado en cada movimiento)
         <input id="aUsuario" class="campo" autocomplete="off" maxlength="40">
       </label>
+      <label class="casilla"><input type="checkbox" id="aCatalogo" checked> Completar productos nuevos con Open Food Facts Chile</label>
       <p id="aError" class="error" hidden></p>
       <button class="btn" id="btnConectar">Conectar</button>
       <button type="button" class="btn sec" id="btnCompartir" hidden>Copiar enlace para otro dispositivo</button>
@@ -235,6 +239,7 @@
         <strong id="pStock" class="mono"></strong>
         <span id="pBajo" class="chip" hidden>En el mínimo o bajo él</span>
       </div>
+      <p class="nota-auto" id="pAuto" hidden>Se anotó solo con datos de Open Food Facts. Revisa el nombre y agrega el precio en «Editar producto».</p>
       <div class="cantidad">
         <button type="button" id="btnMenos" aria-label="Una unidad menos">−</button>
         <input id="cantidad" class="campo" type="number" inputmode="numeric" min="1" step="1" value="1" aria-label="Cantidad">
@@ -268,7 +273,10 @@
           <input id="eNombre" class="campo" required autocomplete="off">
         </label>
         <label>Categoría
-          <input id="eCategoria" class="campo" autocomplete="off">
+          <select id="eCategoriaSel" class="campo" data-otra="eCategoriaOtra"></select>
+        </label>
+        <label id="eCategoriaOtraEtq" hidden>Nombre de la nueva categoría
+          <input id="eCategoriaOtra" class="campo" autocomplete="off" maxlength="40" placeholder="Ej.: Repuestos de bicicleta">
         </label>
         <div class="dos">
           <label>Precio de venta
@@ -297,7 +305,10 @@
           <input id="nNombre" class="campo" required autocomplete="off">
         </label>
         <label>Categoría
-          <input id="nCategoria" class="campo" autocomplete="off">
+          <select id="nCategoriaSel" class="campo" data-otra="nCategoriaOtra"></select>
+        </label>
+        <label id="nCategoriaOtraEtq" hidden>Nombre de la nueva categoría
+          <input id="nCategoriaOtra" class="campo" autocomplete="off" maxlength="40" placeholder="Ej.: Repuestos de bicicleta">
         </label>
         <div class="dos">
           <label>Precio de venta
@@ -437,11 +448,11 @@
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     }
     if (API_FIJA) c.api = API_FIJA;
-    return { api: c.api || '', pin: c.pin || '', usuario: c.usuario || '', demo: false };
+    return { api: c.api || '', pin: c.pin || '', usuario: c.usuario || '', catalogo: c.catalogo !== false, demo: false };
   }
 
   function guardarCfg() {
-    try { localStorage.setItem(ALMACEN, JSON.stringify({ api: cfg.api, pin: cfg.pin, usuario: cfg.usuario })); } catch (e) {}
+    try { localStorage.setItem(ALMACEN, JSON.stringify({ api: cfg.api, pin: cfg.pin, usuario: cfg.usuario, catalogo: cfg.catalogo })); } catch (e) {}
   }
 
   /* ---------- Llamadas a la planilla ---------- */
@@ -470,16 +481,16 @@
   // Datos de ejemplo en memoria, para probar la página sin planilla.
   var demoDatos = {};
   [
-    ['7801234567894', 'Bebida cola 1,5 L', 'Bebidas', 12, 6, 1890, 1250],
-    ['7801234567900', 'Agua mineral 1,6 L', 'Bebidas', 20, 8, 990, 560],
-    ['7801234567917', 'Jugo naranja 1 L', 'Bebidas', 7, 5, 1350, 820],
+    ['7801234567894', 'Bebida cola 1,5 L', 'Bebidas, jugos y aguas', 12, 6, 1890, 1250],
+    ['7801234567900', 'Agua mineral 1,6 L', 'Bebidas, jugos y aguas', 20, 8, 990, 560],
+    ['7801234567917', 'Jugo naranja 1 L', 'Bebidas, jugos y aguas', 7, 5, 1350, 820],
     ['7809876543214', 'Arroz grado 1, 1 kg', 'Abarrotes', 4, 5, 1490, 980],
     ['7809876543221', 'Fideos espagueti 400 g', 'Abarrotes', 18, 6, 890, 520],
     ['7809876543238', 'Aceite maravilla 1 L', 'Abarrotes', 6, 4, 2990, 2100],
-    ['7805555000012', 'Galletas de avena', 'Snacks', 15, 5, 990, 600],
-    ['7805555000029', 'Papas fritas 180 g', 'Snacks', 2, 6, 1690, 1050],
-    ['7807777000015', 'Detergente 3 L', 'Limpieza', 5, 2, 5490, 3800],
-    ['7807777000022', 'Cloro 1 L', 'Limpieza', 9, 3, 990, 540]
+    ['7805555000012', 'Galletas de avena', 'Dulces y golosinas', 15, 5, 990, 600],
+    ['7805555000029', 'Papas fritas 180 g', 'Snacks salados', 2, 6, 1690, 1050],
+    ['7807777000015', 'Detergente 3 L', 'Aseo y limpieza', 5, 2, 5490, 3800],
+    ['7807777000022', 'Cloro 1 L', 'Aseo y limpieza', 9, 3, 990, 540]
   ].forEach(function (f) {
     demoDatos[f[0]] = { codigo: f[0], producto: f[1], categoria: f[2], stock: f[3], minimo: f[4], precio: f[5], costo: f[6] };
   });
@@ -504,6 +515,10 @@
     // Dos productos sin ventas recientes, para que la tarjeta "Sin movimiento" muestre algo.
     return movs.filter(function (m) { return m[1] !== '7807777000015' && m[1] !== '7801234567917' || m[0] < diaLocal(new Date(hoy.getTime() - 40 * 864e5)); });
   })();
+  // Catálogo de prueba: en la demostración, escribe o escanea 3017620422003.
+  var demoCatalogo = {
+    '3017620422003': { product_name: 'Nutella', brands: 'Ferrero', quantity: '400 g', categories_tags: ['en:breakfasts', 'en:spreads', 'en:sweet-spreads'] }
+  };
   function demoMov(codigo, tipo, cantidad, motivo) { demoMovs.push([diaLocal(new Date()), codigo, tipo, cantidad, motivo || '']); }
   function demoTodos() { return Object.keys(demoDatos).map(function (k) { return Object.assign({}, demoDatos[k]); }); }
   function demoFiltrar(texto) {
@@ -515,8 +530,9 @@
       setTimeout(function () {
         try {
           if (accion === 'estado') {
-            var e = { negocio: 'Demostración (no guarda nada)', productos: 0, unidades: 0, valorCosto: 0, valorVenta: 0, porReponer: 0 };
+            var e = { negocio: 'Demostración (no guarda nada)', productos: 0, unidades: 0, valorCosto: 0, valorVenta: 0, porReponer: 0, categorias: [] };
             demoTodos().forEach(function (x) {
+              if (x.categoria && e.categorias.indexOf(x.categoria) < 0) e.categorias.push(x.categoria);
               e.productos++; e.unidades += x.stock; e.valorCosto += x.stock * x.costo; e.valorVenta += x.stock * x.precio;
               if (x.stock <= x.minimo) e.porReponer++;
             });
@@ -551,7 +567,7 @@
           }
           if (accion === 'crear') {
             demoDatos[d.codigo] = { codigo: d.codigo, producto: d.producto, categoria: d.categoria, stock: d.stock, minimo: d.minimo, precio: d.precio, costo: d.costo };
-            demoMov(d.codigo, 'Alta', d.stock, 'Producto nuevo');
+            demoMov(d.codigo, 'Alta', d.stock, d.origen ? 'Producto nuevo (' + d.origen + ')' : 'Producto nuevo');
             return ok(Object.assign({}, demoDatos[d.codigo]));
           }
         } catch (e) { mal(e); }
@@ -590,6 +606,7 @@
     $('aUrl').value = cfg.api;
     $('aPin').value = cfg.pin;
     $('aUsuario').value = cfg.usuario;
+    $('aCatalogo').checked = cfg.catalogo !== false;
     $('aError').hidden = !error;
     $('aError').textContent = error || '';
     var conectado = !!cfg.api || cfg.demo;
@@ -623,6 +640,7 @@
   function pintarEstado(e) {
     $('negocio').textContent = e.negocio + ' · ' + nf.format(e.productos) + ' productos';
     ponerReponer(e.porReponer || 0);
+    if (e.categorias) { categoriasHoja = []; e.categorias.forEach(sumarCategoria); }
   }
 
   function ponerReponer(n) {
@@ -640,12 +658,12 @@
       $('aError').textContent = 'Esa no parece la URL de la aplicación web. Debe empezar con https://script.google.com/ y terminar en /exec.';
       return;
     }
-    cfg.api = url; cfg.pin = $('aPin').value.trim(); cfg.usuario = $('aUsuario').value.trim(); cfg.demo = false;
+    cfg.api = url; cfg.pin = $('aPin').value.trim(); cfg.usuario = $('aUsuario').value.trim(); cfg.catalogo = $('aCatalogo').checked; cfg.demo = false;
     guardarCfg();
     conectar();
   });
 
-  $('btnDemo').addEventListener('click', function () { cfg.usuario = $('aUsuario').value.trim(); cfg.demo = true; conectar(); });
+  $('btnDemo').addEventListener('click', function () { cfg.usuario = $('aUsuario').value.trim(); cfg.catalogo = $('aCatalogo').checked; cfg.demo = true; conectar(); });
   $('btnAjustes').addEventListener('click', function () { cerrarPaneles(); abrirAjustes(); });
   $('btnCerrarAjustes').addEventListener('click', cerrarAjustes);
 
@@ -784,6 +802,104 @@
   function pausar() { if (camara === 'leyendo') estadoCamara('pausa'); }
   function reanudar() { if (camara === 'pausa') { ultimo.hora = Date.now(); estadoCamara('leyendo'); } }
 
+  /* ---------- Catálogo externo: Open Food Facts Chile ---------- */
+
+  var CATALOGO_URL = 'https://cl.openfoodfacts.org/api/v2/product/';
+  var CATALOGO_CAMPOS = 'product_name,product_name_es,generic_name,generic_name_es,brands,quantity,categories_tags';
+  // Categorías de Open Food Facts → categorías de la lista. Gana la primera que coincida.
+  var MAPA_CATALOGO = [
+    ['Licores y cervezas', ['en:alcoholic-beverages', 'en:beers', 'en:wines', 'en:spirits', 'en:ciders']],
+    ['Congelados', ['en:frozen-foods', 'en:ice-creams', 'en:frozen-desserts']],
+    ['Lácteos y huevos', ['en:dairies', 'en:milks', 'en:cheeses', 'en:yogurts', 'en:eggs', 'en:butters']],
+    ['Café, té y desayuno', ['en:coffees', 'en:teas', 'en:herbal-teas', 'en:breakfast-cereals', 'en:breakfasts']],
+    ['Bebidas, jugos y aguas', ['en:beverages', 'en:waters', 'en:sodas', 'en:juices', 'en:fruit-juices']],
+    ['Fiambrería y cecinas', ['en:prepared-meats', 'en:hams', 'en:sausages', 'en:salamis', 'en:meats']],
+    ['Panadería', ['en:breads', 'en:viennoiseries', 'en:pastries']],
+    ['Snacks salados', ['en:salty-snacks', 'en:chips-and-fries', 'en:crisps', 'en:appetizers']],
+    ['Dulces y golosinas', ['en:sweet-snacks', 'en:confectioneries', 'en:chocolates', 'en:candies', 'en:biscuits-and-cakes', 'en:biscuits', 'en:sweet-spreads', 'en:desserts']],
+    ['Frutas y verduras', ['en:fresh-fruits', 'en:fresh-vegetables']],
+    ['Mascotas', ['en:pet-food']]
+  ];
+  var sinCatalogo = {};   // códigos que ya se consultaron sin resultado en esta sesión
+
+  function esCodigoBarras(c) { return /^\d{8,14}$/.test(c); }
+  function limpiarTxt(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); }
+
+  // Nombre para la planilla: el del producto, más la marca y el tamaño si no vienen incluidos.
+  function nombreCatalogo(p) {
+    var nombre = limpiarTxt(p.product_name_es || p.product_name || p.generic_name_es || p.generic_name);
+    if (!nombre) return '';
+    var plano = function (t) { return claveCat(t).replace(/\s/g, ''); };
+    var marca = limpiarTxt(String(p.brands || '').split(',')[0]);
+    if (marca && plano(nombre).indexOf(plano(marca)) < 0) nombre += ' ' + marca;
+    var cantidad = limpiarTxt(p.quantity);
+    if (cantidad && plano(nombre).indexOf(plano(cantidad)) < 0) nombre += ' ' + cantidad;
+    return nombre.slice(0, 120);
+  }
+
+  function categoriaCatalogo(tags) {
+    tags = tags || [];
+    for (var i = 0; i < MAPA_CATALOGO.length; i++) {
+      if (MAPA_CATALOGO[i][1].some(function (t) { return tags.indexOf(t) >= 0; })) return MAPA_CATALOGO[i][0];
+    }
+    return 'Abarrotes';
+  }
+
+  function interpretarCatalogo(codigo, producto) {
+    var nombre = producto && nombreCatalogo(producto);
+    if (!nombre) { sinCatalogo[codigo] = true; return { sinDatos: true }; }
+    return { producto: { nombre: nombre, categoria: categoriaCatalogo(producto.categories_tags) } };
+  }
+
+  // Resultado: { producto: { nombre, categoria } } | { sinDatos: true } | { error: 'ocupado' | 'red' }
+  function consultarCatalogo(codigo) {
+    if (cfg.catalogo === false || !esCodigoBarras(codigo) || sinCatalogo[codigo]) return Promise.resolve({ sinDatos: true });
+    if (cfg.demo) return new Promise(function (ok) { setTimeout(function () { ok(interpretarCatalogo(codigo, demoCatalogo[codigo])); }, 300); });
+    var porScript = function () {
+      // El navegador no pudo consultar directo (bloqueo o red): se pide a la planilla que lo consulte.
+      return api('catalogo', { codigo: codigo }).then(function (d) {
+        if (d.ocupado) return { error: 'ocupado' };
+        return interpretarCatalogo(codigo, d.encontrado ? d.producto : null);
+      }, function () { return { error: 'red' }; });
+    };
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var reloj = setTimeout(function () { if (ctrl) ctrl.abort(); }, 7000);
+    return fetch(CATALOGO_URL + codigo + '.json?fields=' + CATALOGO_CAMPOS, ctrl ? { signal: ctrl.signal } : {})
+      .then(function (r) {
+        if (r.status === 429) return { error: 'ocupado' };
+        if (r.status === 404) return interpretarCatalogo(codigo, null);
+        if (!r.ok) return { error: 'red' };
+        return r.json().then(function (d) { return interpretarCatalogo(codigo, d && d.status === 1 ? d.product : null); });
+      }, function (e) {
+        return e && e.name === 'AbortError' ? { error: 'red' } : porScript();
+      })
+      .then(function (res) { clearTimeout(reloj); return res; });
+  }
+
+  function avisoCatalogo(res) {
+    if (res.error === 'ocupado') return 'Open Food Facts pidió esperar un momento. Regístralo a mano o reintenta en un minuto.';
+    if (res.error) return 'No se pudo consultar Open Food Facts. Regístralo a mano.';
+    return '';
+  }
+
+  // Crea en la planilla un producto encontrado en el catálogo, con stock 0.
+  function crearDesdeCatalogo(codigo, datos) {
+    return api('crear', {
+      codigo: codigo, producto: datos.nombre, categoria: datos.categoria,
+      stock: 0, minimo: 0, precio: 0, costo: 0, origen: 'Open Food Facts'
+    }).then(function (p) {
+      registrar(0, p, 'nuevo · Open Food Facts');
+      sumarCategoria(p.categoria);
+      ponerReponer(porReponer + bajo(p));
+      deshacer = null; pintarDeshacer();
+      return p;
+    }, function (e) {
+      // Si otro teléfono lo creó justo antes, se usa ese.
+      if (/ya existe/.test((e && e.message) || '')) return api('buscar', { codigo: codigo }).then(function (r) { return r.producto; });
+      throw e;
+    });
+  }
+
   /* ---------- Buscar, mover y crear ---------- */
 
   // "ampliar" se usa cuando el texto se escribió a mano: si no es un código exacto, busca por nombre.
@@ -797,17 +913,30 @@
     aviso('Buscando ' + codigo + '…');
     api('buscar', { codigo: codigo, ampliar: !!ampliar }).then(function (r) {
       $('aviso').className = '';
-      if (r.encontrado) mostrarProducto(r.producto);
-      else if (ampliar && r.parecidos && r.parecidos.length) mostrarLista('Resultados para "' + codigo + '"', r.parecidos, /\s/.test(codigo) ? '' : codigo);
-      else if (ampliar && /\s/.test(codigo)) { aviso('Sin resultados para "' + codigo + '".', true); reanudar(); }
-      else mostrarNuevo(r.codigo);
+      if (r.encontrado) return mostrarProducto(r.producto);
+      // No está en la planilla: si parece código de barras, se busca en Open Food Facts.
+      var siguiente = function () {
+        if (ampliar && r.parecidos && r.parecidos.length) mostrarLista('Resultados para "' + codigo + '"', r.parecidos, /\s/.test(codigo) ? '' : codigo);
+        else if (ampliar && /\s/.test(codigo)) { aviso('Sin resultados para "' + codigo + '".', true); reanudar(); }
+        else mostrarNuevo(r.codigo);
+      };
+      if (!esCodigoBarras(codigo) || cfg.catalogo === false) return siguiente();
+      aviso('Buscando ' + codigo + ' en Open Food Facts…');
+      return consultarCatalogo(codigo).then(function (res) {
+        if (!res.producto) { siguiente(); var t = avisoCatalogo(res); aviso(t || 'No está en Open Food Facts: complétalo a mano.', !!t); return; }
+        return crearDesdeCatalogo(codigo, res.producto).then(function (p) {
+          mostrarProducto(p, true);
+          aviso('Nuevo: ' + p.producto + ' (' + (p.categoria || 'sin categoría') + ')');
+        });
+      });
     }).catch(function (e) {
       fallo(e); reanudar();
     }).then(function () { ocupar(false); });
   }
 
-  function mostrarProducto(p) {
+  function mostrarProducto(p, automatico) {
     actual = p;
+    $('pAuto').hidden = !automatico;
     $('pNombre').textContent = p.producto || '(sin nombre)';
     $('pCodigo').textContent = p.codigo;
     $('pCategoria').textContent = p.categoria || '';
@@ -823,6 +952,7 @@
   function mostrarNuevo(codigo) {
     codigoNuevo = codigo;
     $('formNuevo').reset();
+    llenarCategorias('n', ultimaCategoria);
     $('nCodigo').textContent = codigo;
     $('panelNuevo').hidden = false;
     $('nNombre').focus();
@@ -864,11 +994,21 @@
     api('mover', { codigo: codigo, cantidad: 1, tipo: tipo, motivo: tipo === 'salida' ? 'Venta' : 'Reposición' }).then(function (p) {
       despuesDeMover(tipo, 1, p);
     }).catch(function (e) {
-      if (/no está en el inventario/.test((e && e.message) || '')) {
-        pausar();
-        mostrarNuevo(codigo);
-        aviso('Ese código no está registrado. Créalo para seguir.', true);
-      } else fallo(e);
+      if (!/no está en el inventario/.test((e && e.message) || '')) return fallo(e);
+      var aMano = function (texto) { pausar(); mostrarNuevo(codigo); aviso(texto || 'Ese código no está registrado. Créalo para seguir.', true); };
+      return consultarCatalogo(codigo).then(function (res) {
+        if (!res.producto) return aMano(avisoCatalogo(res));
+        return crearDesdeCatalogo(codigo, res.producto).then(function (p) {
+          if (tipo === 'salida') {
+            pausar(); mostrarProducto(p, true);
+            aviso('Se anotó ' + p.producto + ' con stock 0. Agrega stock antes de venderlo.', true);
+            return;
+          }
+          return api('mover', { codigo: codigo, cantidad: 1, tipo: 'entrada', motivo: 'Reposición' }).then(function (q) {
+            despuesDeMover('entrada', 1, q, 'nuevo · Open Food Facts');
+          });
+        });
+      }).catch(fallo);
     }).then(function () { ocupar(false); });
   }
 
@@ -1229,7 +1369,7 @@
     var datos = {
       codigo: codigoNuevo,
       producto: $('nNombre').value.trim(),
-      categoria: $('nCategoria').value.trim(),
+      categoria: leerCategoria('n'),
       precio: Number($('nPrecio').value) || 0,
       costo: Number($('nCosto').value) || 0,
       minimo: Number($('nMinimo').value) || 0,
@@ -1238,6 +1378,8 @@
     ocupar(true);
     api('crear', datos).then(function (p) {
       registrar(p.stock, p, 'nuevo');
+      sumarCategoria(p.categoria);
+      ultimaCategoria = p.categoria;
       ponerReponer(porReponer + bajo(p));
       deshacer = null; pintarDeshacer();
       aviso('Producto guardado · ' + p.producto + ' · stock ' + nf.format(p.stock));
@@ -1246,13 +1388,99 @@
     }).catch(fallo).then(function () { ocupar(false); });
   });
 
+  /* ---------- Categorías ---------- */
+
+  // Lista sugerida, pensada en almacenes, minimarkets y otros negocios de barrio.
+  var CATEGORIAS_BASE = [
+    ['Almacén', ['Abarrotes', 'Bebidas, jugos y aguas', 'Lácteos y huevos', 'Fiambrería y cecinas', 'Panadería',
+      'Frutas y verduras', 'Congelados', 'Dulces y golosinas', 'Snacks salados', 'Café, té y desayuno',
+      'Licores y cervezas', 'Cigarrillos']],
+    ['Hogar y cuidado personal', ['Aseo y limpieza', 'Cuidado personal', 'Bebés', 'Mascotas', 'Bazar y hogar']],
+    ['Otros rubros', ['Librería y papelería', 'Ferretería', 'Electrónica y accesorios', 'Ropa y calzado']]
+  ];
+  var OTRA = '__otra__';
+  var categoriasHoja = [];     // categorías que ya existen en la planilla
+  var ultimaCategoria = '';    // la última usada al crear: se propone para el siguiente producto
+
+  function claveCat(t) {
+    return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  function categoriasConocidas() {
+    var todas = [];
+    CATEGORIAS_BASE.forEach(function (g) { todas = todas.concat(g[1]); });
+    return todas.concat(categoriasHoja);
+  }
+
+  // Devuelve cómo se escribe una categoría que ya existe (sin importar mayúsculas ni tildes), o null.
+  function categoriaExistente(texto) {
+    var k = claveCat(texto), hallada = null;
+    categoriasConocidas().some(function (c) { if (claveCat(c) === k) { hallada = c; return true; } });
+    return hallada;
+  }
+
+  function sumarCategoria(texto) {
+    texto = String(texto || '').trim();
+    if (texto && !categoriaExistente(texto)) categoriasHoja.push(texto);
+  }
+
+  // Arma el desplegable con: sin categoría, las del negocio, las sugeridas y "Otra categoría".
+  function llenarCategorias(prefijo, valor) {
+    var sel = $(prefijo + 'CategoriaSel');
+    valor = String(valor || '').trim();
+    if (valor) sumarCategoria(valor);
+    var deBase = {};
+    CATEGORIAS_BASE.forEach(function (g) { g[1].forEach(function (c) { deBase[claveCat(c)] = true; }); });
+    var propias = categoriasHoja.filter(function (c) { return !deBase[claveCat(c)]; })
+      .sort(function (a, b) { return a.localeCompare(b); });
+    var opcion = function (padre, v, texto) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = texto === undefined ? v : texto;
+      padre.appendChild(o);
+    };
+    var grupo = function (nombre, lista) {
+      var g = document.createElement('optgroup');
+      g.label = nombre;
+      lista.forEach(function (c) { opcion(g, c); });
+      sel.appendChild(g);
+    };
+    sel.textContent = '';
+    opcion(sel, '', 'Sin categoría');
+    if (propias.length) grupo('Tus categorías', propias);
+    CATEGORIAS_BASE.forEach(function (g) { grupo(g[0], g[1]); });
+    opcion(sel, OTRA, 'Otra categoría (escribir nombre)…');
+    sel.value = valor ? (categoriaExistente(valor) || '') : '';
+    $(prefijo + 'CategoriaOtra').value = '';
+    mostrarOtra(prefijo, false);
+  }
+
+  function mostrarOtra(prefijo, enfocar) {
+    var abierta = $(prefijo + 'CategoriaSel').value === OTRA, campo = $(prefijo + 'CategoriaOtra');
+    $(prefijo + 'CategoriaOtraEtq').hidden = !abierta;
+    campo.required = abierta;                // solo se exige cuando está a la vista
+    if (abierta && enfocar) campo.focus();
+  }
+
+  // Lo que se guarda: la opción elegida, o el nombre escrito (con la ortografía de una existente si coincide).
+  function leerCategoria(prefijo) {
+    var v = $(prefijo + 'CategoriaSel').value;
+    if (v !== OTRA) return v;
+    var t = $(prefijo + 'CategoriaOtra').value.replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    return categoriaExistente(t) || t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  ['n', 'e'].forEach(function (prefijo) {
+    $(prefijo + 'CategoriaSel').addEventListener('change', function () { mostrarOtra(prefijo, true); });
+  });
+
   /* ---------- Editar un producto ---------- */
 
   $('btnEditar').addEventListener('click', function () {
     if (!actual || ocupado) return;
     $('eCodigo').textContent = actual.codigo;
     $('eNombre').value = actual.producto;
-    $('eCategoria').value = actual.categoria;
+    llenarCategorias('e', actual.categoria);
     $('ePrecio').value = actual.precio;
     $('eCosto').value = actual.costo || '';
     $('eMinimo').value = actual.minimo;
@@ -1273,7 +1501,7 @@
     var datos = {
       codigo: actual.codigo,
       producto: $('eNombre').value.trim(),
-      categoria: $('eCategoria').value.trim(),
+      categoria: leerCategoria('e'),
       precio: Number($('ePrecio').value) || 0,
       costo: Number($('eCosto').value) || 0,
       minimo: Number($('eMinimo').value) || 0
@@ -1284,6 +1512,7 @@
     api('editar', datos).then(function (p) {
       if (datos.stock !== undefined && p.stock !== antes) { registrar(p.stock - antes, p, 'ajuste'); deshacer = null; pintarDeshacer(); }
       ponerReponer(porReponer + bajo(p) - bajoAntes);
+      sumarCategoria(p.categoria);
       aviso('Cambios guardados · ' + p.producto);
       $('panelEditar').hidden = true;
       mostrarProducto(p);
