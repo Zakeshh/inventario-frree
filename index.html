@@ -424,6 +424,7 @@
   var nf = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 });
 
   var cfg = leerCfg();
+  if (cfg.desdeEnlace) guardarCfg();   // un enlace compartido deja el teléfono conectado para las próximas veces
   var actual = null;          // producto que se está mostrando
   var codigoNuevo = '';       // código pendiente de alta
   var ocupado = false;
@@ -444,11 +445,11 @@
     try { c = JSON.parse(localStorage.getItem(ALMACEN)) || {}; } catch (e) {}
     var m = location.hash.match(/api=([^&]+)/);
     if (m) {
-      try { c.api = decodeURIComponent(m[1]); } catch (e) {}
+      try { c.api = decodeURIComponent(m[1]); c.desdeEnlace = true; } catch (e) {}
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     }
     if (API_FIJA) c.api = API_FIJA;
-    return { api: c.api || '', pin: c.pin || '', usuario: c.usuario || '', catalogo: c.catalogo !== false, demo: false };
+    return { api: c.api || '', pin: c.pin || '', usuario: c.usuario || '', catalogo: c.catalogo !== false, demo: false, desdeEnlace: !!c.desdeEnlace };
   }
 
   function guardarCfg() {
@@ -854,7 +855,8 @@
   // Resultado: { producto: { nombre, categoria } } | { sinDatos: true } | { error: 'ocupado' | 'red' }
   function consultarCatalogo(codigo) {
     if (cfg.catalogo === false || !esCodigoBarras(codigo) || sinCatalogo[codigo]) return Promise.resolve({ sinDatos: true });
-    if (cfg.demo) return new Promise(function (ok) { setTimeout(function () { ok(interpretarCatalogo(codigo, demoCatalogo[codigo])); }, 300); });
+    // En la demostración, el código de ejemplo responde sin internet; los demás se consultan de verdad.
+    if (cfg.demo && demoCatalogo[codigo]) return new Promise(function (ok) { setTimeout(function () { ok(interpretarCatalogo(codigo, demoCatalogo[codigo])); }, 300); });
     var porScript = function () {
       // El navegador no pudo consultar directo (bloqueo o red): se pide a la planilla que lo consulte.
       return api('catalogo', { codigo: codigo }).then(function (d) {
@@ -1557,7 +1559,15 @@
 
   /* ---------- Arranque ---------- */
 
-  if (cfg.api) { $('vistaEscaner').hidden = false; conectar(); }
+  // Si con la página ya abierta se abre un enlace #demo o #api=, se recarga para aplicarlo.
+  window.addEventListener('hashchange', function () { if (/^#(demo|api=)/.test(location.hash)) location.reload(); });
+
+  // Un enlace terminado en #demo (por ejemplo, desde el QR del stand) abre directo la demostración,
+  // sin tocar la conexión guardada en este dispositivo.
+  if (location.hash === '#demo') {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    cfg.demo = true; $('vistaEscaner').hidden = false; conectar();
+  } else if (cfg.api) { $('vistaEscaner').hidden = false; conectar(); }
   else abrirAjustes();
 })();
 </script>
